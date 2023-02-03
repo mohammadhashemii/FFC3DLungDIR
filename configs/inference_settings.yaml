@@ -1,0 +1,19 @@
+# dataset configs
+test_data_path: ./data/DIR-Lab/4DCT/mha_cropped/
+patch_size: 64
+overlap_size: 8
+test_cases: [1]
+
+# dataloader configs
+data_loader:
+  batch_size: 1
+  shuffle: False
+  num_workers: 1
+
+# criterion settings
+window_size : 6
+lamda: 0.05
+mu: 0.5
+
+# save directories
+save_dir: ./experiments/

@@ -1,0 +1,28 @@
+# dataset configs
+train_data_path: ./data/CREATISDataset/mha_cropped/
+test_data_path: ./data/DIR-Lab/4DCT/mha_cropped/
+patch_size: 64
+overlap_size: 8
+train_cases: [1, 2, 3, 4, 5]
+val_cases: [6]
+test_cases: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+# dataloader configs
+data_loader:
+  batch_size: 8
+  shuffle: True
+  num_workers: 1
+
+# training settings
+n_epochs: 60
+lr: 0.001
+momentum: 0.99
+save_every: 1000
+
+# criterion settings
+window_size : 9
+lamda: 0.05
+mu: 1
+
+# save directories
+save_dir: ./experiments/

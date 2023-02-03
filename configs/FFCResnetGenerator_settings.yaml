@@ -1,0 +1,22 @@
+input_nc: 2
+output_nc: 3
+ngf: 16
+n_downsampling: 2
+# n_blocks: 1 # FFC3DLungDIR_1
+n_blocks: 3 # FFC3DLungDIR_3
+# n_blocks: 5 # FFC3DLungDIR_5
+
+init_conv_kwargs:
+  ratio_gin: 0
+  ratio_gout: 0
+  enable_lfu: False
+
+downsample_conv_kwargs:
+  ratio_gin: 0
+  ratio_gout: 0
+  enable_lfu: False
+
+resnet_conv_kwargs:
+  ratio_gin: 0.75
+  ratio_gout: 0.75
+  enable_lfu: False

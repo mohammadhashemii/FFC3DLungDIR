@@ -52,7 +52,7 @@ class IndexTracker(object):
         self.update()
 
     def onscroll(self, event):
-        print("%s %s" % (event.button, event.step))
+        # print("%s %s" % (event.button, event.step))
         if event.button == 'up':
             self.ind = (self.ind + 1) % self.slices
         else:
@@ -63,3 +63,19 @@ class IndexTracker(object):
         self.im.set_data(self.X[self.ind, :, :])
         self.ax.set_ylabel('slice %s' % self.ind)
         self.im.axes.figure.canvas.draw()
+
+
+
+
+mhd_file = './data/CREATIS/5/00_R.mha'
+image = sitk.ReadImage(mhd_file)
+image_array = sitk.GetArrayFromImage(image)
+width, height, depth = image_array.shape
+
+# You can also access the spacing and origin information from the image
+spacing = image.GetSpacing()
+origin = image.GetOrigin()
+
+
+view3d_image(image_array, slice_axis=0)
+import ipdb; ipdb.set_trace()

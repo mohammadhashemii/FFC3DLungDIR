@@ -67,15 +67,16 @@ class IndexTracker(object):
 
 
 
-mhd_file = './data/CREATIS/5/00_R.mha'
-image = sitk.ReadImage(mhd_file)
-image_array = sitk.GetArrayFromImage(image)
-width, height, depth = image_array.shape
+# # mhd_file = './data/CREATIS/0/10_R_enhanced.mha'
+# mhd_file = './data/DIRLAB/mha/case10/case10_T00_R.mha'
+# image = sitk.ReadImage(mhd_file)
+# image_array = sitk.GetArrayFromImage(image)
+# width, height, depth = image_array.shape
 
-# You can also access the spacing and origin information from the image
-spacing = image.GetSpacing()
-origin = image.GetOrigin()
+# # You can also access the spacing and origin information from the image
+# spacing = image.GetSpacing()
+# origin = image.GetOrigin()
 
 
-view3d_image(image_array, slice_axis=0)
-import ipdb; ipdb.set_trace()
+# view3d_image(image_array, slice_axis=0)
+# import ipdb; ipdb.set_trace()

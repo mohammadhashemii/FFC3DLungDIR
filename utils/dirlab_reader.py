@@ -48,7 +48,7 @@ def img_converter(data_folder, data, type_im, cn, ext='.mha', mha_folder_name='m
 
     if data == 'DIR-Lab_4D':
         type_im_list = ['T00', 'T10', 'T20', 'T30', 'T40', 'T50', 'T60', 'T70', 'T80', 'T90']
-        data_folder_sub = data_folder + 'DIR-Lab/4DCT/'
+        data_folder_sub = data_folder + 'DIRLAB/'#4DCT/'
         if cn < 6:
             im_img_name = 'Images/case' + str(cn) + '_' + type_im_list[type_im] + '-ssm.img'
         else:
@@ -106,9 +106,8 @@ def img_converter(data_folder, data, type_im, cn, ext='.mha', mha_folder_name='m
         # 1,2) reading image:----------------------------------------------------------------
         fid = open(im_img_address, 'rb')
         im_data = np.fromfile(fid, np.int16)
-        # image_old = im_data.reshape(dirlab_header['case' + str(cn)]['Size'][::-1])
-        image_old = im_data.reshape(dirlab_header['case' + str(cn)]['Size'])
-        # print(image_old.shape)
+        image_old = im_data.reshape(dirlab_header['case' + str(cn)]['Size'][::-1])
+        # image_old = im_data.reshape(dirlab_header['case' + str(cn)]['Size'])
         image_old = np.flip(image_old, axis=0)  # The superior-inferior axis needs to be flipped
         origin = [0, 0, 0]
         image = copy.deepcopy(image_old)
@@ -248,7 +247,7 @@ def dirlab_4dct_header():
 def main():
     data = 'DIR-Lab_4D'
     data_folder = './data/'
-    for cn in range(1, 2):
+    for cn in range(1, 11):
         for type_im in range(0, 10):
             img_converter(data_folder=data_folder, data=data, type_im=type_im, cn=cn)
 

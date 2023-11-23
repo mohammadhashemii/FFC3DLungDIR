@@ -115,6 +115,64 @@ def extract_patches(entire_image, win_size=64, overlap_size=8, padding=False):
 
     return patches
 
+
+def extract_patch(fixed_image_array, moving_image_array, patch_size, selection_type='random'):
+    D, H, W = fixed_image_array.shape
+    if selection_type == 'random':
+        # Randomly choose the starting coordinates for the patch from uniform distribution
+        d_start = np.random.randint(0, D - patch_size + 1)
+        h_start = np.random.randint(0, H - patch_size + 1)
+        w_start = np.random.randint(0, W - patch_size + 1)
+
+    elif selection_type == 'normal':
+        # Define standard deviation to ensure 99.9% of samples occur within [0,(*)-patch_size] for (*) = D, H, W
+        d_sigma = (D - patch_size)/6
+        h_sigma = (H - patch_size)/6
+        w_sigma = (W - patch_size)/6
+        d_mu = (D - patch_size)/2
+        h_mu = (H - patch_size)/2
+        w_mu = (W - patch_size)/2
+
+        # Randomly choose the starting coordinates for the patch from normal distribution
+        d_start = d_sigma * np.random.randn() + d_mu
+        h_start = h_sigma * np.random.randn() + h_mu
+        w_start = w_sigma * np.random.randn() + w_mu
+
+        # Round index to nearest integer
+        d_start = int(round(d_start))
+        h_start = int(round(h_start))
+        w_start = int(round(w_start))
+
+        # Ensure valid index is chosen
+        if d_start < 0:
+            d_start = 0
+        if d_start >= D - patch_size + 1:
+            d_start = D - patch_size
+
+        if h_start < 0:
+            h_start = 0
+        if h_start >= H - patch_size + 1:
+            h_start = H - patch_size
+
+        if w_start < 0:
+            w_start = 0
+        if w_start >= W - patch_size + 1:
+            w_start = W - patch_size
+
+    else:
+        raise ValueError("Unsupported selection_type")
+
+    # Extract patches from both images
+    fixed_patch = fixed_image_array[d_start:d_start+patch_size, h_start:h_start+patch_size, w_start:w_start+patch_size]
+    moving_patch = moving_image_array[d_start:d_start+patch_size, h_start:h_start+patch_size, w_start:w_start+patch_size]
+
+    # Stack the patches along the first dimension
+    stacked_patch = np.stack([fixed_patch, moving_patch], axis=0)
+
+    return stacked_patch
+
+
+
 class DIRLABDataset(data.Dataset):
     def __init__(self, root, case_list: list, patch_size=64, overlap_size=8, phases=[0, 5], transform=None):
         self.root = root
@@ -166,14 +224,14 @@ class DIRLABDataset(data.Dataset):
 
         
 class CREATISDataset(data.Dataset):
-    def __init__(self, root, case_list: list, patch_size=64, overlap_size=8, transform=None):
+    def __init__(self, root, case_list: list, patch_size=64, patch_selection='normal', transform=None):
         self.root = root
         self.patch_size = patch_size
-        self.overlap_size = overlap_size
+        self.patch_selection = patch_selection
         self.transform = transform
 
         # create a list of image pair IDs
-        self.IDs_list = generate_IDs_list_v2(root=root, case_list=case_list, n_phases=10)
+        self.IDs_list = generate_IDs_list(case_list=case_list, n_phases=10)
 
     def __len__(self):
         return len(self.IDs_list)
@@ -183,31 +241,18 @@ class CREATISDataset(data.Dataset):
         ID = self.IDs_list[index]
 
         # load fixed image data
-        im_sitk = sitk.ReadImage(self.root + 'case' + str(ID['case']) + '/case' + str(ID['case']) + '_patches_' + 'w' + str(self.patch_size) + 'o' + str(self.overlap_size)
-                                 + '/case' + str(ID['case']) + '_'
-                                 + 'T' + str(ID['fixed_image_phase_num']) + '0' 
-                                 +  '_patch' + str(ID['patch_idx']) + '.mha')
+        im_sitk = sitk.ReadImage(self.root + str(ID['case']) + '/' + str(ID['fixed_image_phase_num']) + '0' '_R.mha')
         fixed_image = torch.Tensor(sitk.GetArrayFromImage(im_sitk))
-        # mean, std = torch.mean(fixed_image), torch.std(fixed_image)
-        
-        # fixed_image  = (fixed_image - mean) / std
-
         fixed_image = (fixed_image - torch.min(fixed_image)) / (torch.max(fixed_image) - torch.min(fixed_image))
 
-        
         # load moving image data
-        im_sitk = sitk.ReadImage(self.root + 'case' + str(ID['case']) + '/case' + str(ID['case']) + '_patches_' + 'w' + str(self.patch_size) + 'o' + str(self.overlap_size)
-                                 + '/case' + str(ID['case']) + '_'
-                                 + 'T' + str(ID['moving_image_phase_num']) + '0' 
-                                 +  '_patch' + str(ID['patch_idx']) + '.mha')
+        im_sitk = sitk.ReadImage(self.root + str(ID['case']) + '/' + str(ID['moving_image_phase_num']) + '0' '_R.mha')
         moving_image = torch.Tensor(sitk.GetArrayFromImage(im_sitk))
-        # mean, std = torch.mean(moving_image), torch.std(moving_image)
-        # moving_image   = (moving_image - mean) / std
 
         moving_image = (moving_image - torch.min(moving_image)) / (torch.max(moving_image) - torch.min(moving_image))
 
 
-
-        paired_patches = torch.stack([fixed_image, moving_image], dim=0) # (c=2, d, h, w)
+        # extract a single pair of patch
+        paired_patches = extract_patch(fixed_image, moving_image, patch_size=self.patch_size, selection_type=self.patch_selection)
 
         return paired_patches

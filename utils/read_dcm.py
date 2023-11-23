@@ -2,16 +2,9 @@ import pydicom
 import os
 import glob
 import numpy as np
-import SimpleITK as sitk
+import conda install -c conda-forge simpleitk as sitk
 import utils.image_processing as ip
 import matplotlib.pyplot as plt
-
-# dcm_path = "./data/Nabavi/Patient-1/00/00-slice001.dcm"
-# dicom = pydicom.read_file(dcm_path)
-# array = dicom.pixel_array
-#
-# print(array.shape)
-
 
 def write_volumes(root):
     for case in sorted(os.listdir(root))[-2:]:

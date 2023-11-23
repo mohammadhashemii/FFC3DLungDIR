@@ -10,13 +10,13 @@ def enhance_image(image_address, _scale_range = (0.56, 2), mask_weight = 1000):
     mask = skimage.filters.frangi(image_array, black_ridges=False, beta=0.5, scale_range=_scale_range, scale_step=0.5)
     enhanced_image_array = image_array + mask * 1000
     enhanced_image = sitk.GetImageFromArray(enhanced_image_array)
-    sitk.WriteImage(enhanced_image, image_address)
+    new_address = image_address.split(".mha")[0] + "_enhanced.mha"
+    sitk.WriteImage(enhanced_image, new_address)
     return 
 
 if __name__ == '__main__':
-    creatis_dir = '../data/CREATIS/'
-    # to_be_enhanced_list = [0, 1, 2, 3, 4, 5]
-    to_be_enhanced_list = [4]
+    creatis_dir = './data/CREATIS/'
+    to_be_enhanced_list = [0, 1, 2, 3, 4, 5]
     for e in to_be_enhanced_list:
         for p in range(10):
             resampled_img_address = creatis_dir + str(e) + '/' + str(p) + '0_R.mha'

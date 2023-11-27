@@ -91,7 +91,6 @@ class Dice:
         dice = torch.mean(top / bottom)
         return -dice
 
-
 class Grad:
     """
     N-D gradient loss.
@@ -161,23 +160,16 @@ def jacobian_determinant(disp):
 
         return dfdx[..., 0] * dfdy[..., 1] - dfdy[..., 0] * dfdx[..., 1]
 
-def compute_loss(y_pred, y_true, dvf, window_size=9, lamda=0.1, mu=0.5):
+def compute_loss(y_pred, y_true, dvf, window_size=9, lamda=0.1, mu1=1, mu2=0.5):
     ncc = NCC().loss(y_true, y_pred)  # similarity loss
-    # dice = Dice().loss(y_true, y_pred)
-    sm = Grad(penalty='l2').loss(dvf) + Grad(penalty='l1').loss(dvf)  # smoothing loss
-    # print("NCC loss: {}, SM loss: {}".format(ncc, sm))
-    # print("DICE loss: {}, SM loss: {}".format(dice, sm))
-
-    # total_loss = -1.0 * ncc
+    sm = mu1 * Grad(penalty='l2').loss(dvf) + mu2 * Grad(penalty='l1').loss(dvf)  # smoothing loss
     total_loss = (1.0 - ncc) + lamda * sm
-    # print(total_loss)
 
-    # total_loss = dice
-
-    return total_loss
+    return total_loss, ncc, sm
 
 # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-# t1 = torch.ones([1, 1, 64, 64, 64], dtype=torch.float32).to(device)
-# t2 = torch.zeros([1, 1, 64, 64, 64], dtype=torch.float32).to(device)
-# ncc = Dice().loss(t1, t2)  # similarity loss
-# print(ncc)
+# t1 = torch.zeros([1, 1, 64, 64, 64], dtype=torch.float32).to(device)
+# t2 = torch.ones([1, 1, 64, 64, 64], dtype=torch.float32).to(device) / 2
+# # ncc = NCC().loss(t1, t2)  # similarity loss
+
+# import ipdb; ipdb.set_trace()

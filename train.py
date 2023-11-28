@@ -43,13 +43,6 @@ print('VALIDATION DATA: {} pairs of fixed/moving images.'.format(len(val_dataset
 train_loader = DataLoader(train_dataset, **train_configs['data_loader'])
 val_loader = DataLoader(val_dataset, **train_configs['data_loader'])
 
-# test_dataset = DIRLABDataset(root=train_configs['test_data_path'],
-#                           case_list=train_configs['test_cases'],
-#                           phases=[0, 5]) # maximum inhale and exhale
-# print('TEST DATA: {} pairs of fixed/moving images.'.format(len(test_dataset)))
-# test_loader = DataLoader(test_dataset, **train_configs['data_loader'])
-
-
 # Model defining
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
@@ -73,13 +66,14 @@ if args.starting_epoch is not None:
     generator_weights = "saved_ours/exp" + args.exp + "_epoch" + str(args.starting_epoch) + "_gen.pth"
     stn_weights = "saved_ours/exp" + args.exp + "_epoch" + str(args.starting_epoch) + "_stn.pth"
 
-    import ipdb; ipdb.set_trace()
     FFCGenerator.load_state_dict(torch.load(generator_weights))
     stn.load_state_dict(torch.load(stn_weights))
 
+if args.starting_epoch is None:
+    starting_epoch = 0
 
 # Loop over epochs for training
-for epoch in range(args.starting_epoch, args.starting_epoch + train_configs['n_epochs'] + 1):
+for epoch in range(starting_epoch, starting_epoch + train_configs['n_epochs'] + 1):
 
     batch_counter = 0
     # epoch losses
@@ -125,7 +119,6 @@ for epoch in range(args.starting_epoch, args.starting_epoch + train_configs['n_e
 
         # validation
         with torch.no_grad():
-
             # epoch losses
             epoch_val_loss = 0.0
             epoch_val_ncc = 0.0
@@ -171,48 +164,6 @@ for epoch in range(args.starting_epoch, args.starting_epoch + train_configs['n_e
     #         print("--------------")
     #         test_per_case(experiment=EXPERIMENT, case_num=c+1, phases_list=[0, 5], epoch_idx=epoch)
 
-    #     print("RUNNING TRAIN LOSS={}".format(running_train_loss / train_configs['save_every']))
-    #     running_train_loss = 0.0
-
-    # validation
-    # test_loss = 0.0
-    # with torch.no_grad():
-    #     for paired_patches, _ in tqdm(test_loader):
-
-    #         # paired_patches shape: [batch, 2, d, h, w]   
-    #         pair = paired_patches.to(device)
-    #         DVF = FFCGenerator(pair).cpu()
-
-    #         fi = torch.unsqueeze(pair[:, 0, :], 1).cpu() # fixed patch 
-    #         mi = torch.unsqueeze(pair[:, 1, :], 1).cpu() # moving patch
-    #         registered_images = stn(mi.permute(0, 1, 4, 3, 2), # (batch, c, w, h, d)
-    #                                 DVF.permute(0, 1, 4, 3, 2))
-
-    #         registered_images = registered_images.permute(0, 1, 4, 3, 2)
-
-    #         # compute loss
-    #         loss = compute_loss(y_pred=registered_images.to(device),
-    #                                 y_true=fi.to(device),
-    #                                 dvf=DVF.to(device),
-    #                                 window_size=train_configs['window_size'],
-    #                                 lamda=train_configs['lamda'],
-    #                                 mu=train_configs['mu'])
-
-    #         test_loss += registered_images.shape[0] * loss.item()
-    #         del loss, pair, DVF, fi, mi, registered_images  # to reduce memory usage
-
-    # torch.save(FFCGenerator.state_dict(), train_configs['save_dir'] + "exp" + str(EXPERIMENT) + "_patch64_generator.pth")
-    # torch.save(stn.state_dict(), train_configs['save_dir'] + "exp" + str(EXPERIMENT) + "_patch64_stn.pth")
-
-    # # test on test set
-    # for c in range(5):
-    #     print("--------------")
-    #     test_per_case(experiment=EXPERIMENT, case_num=c+1, phases_list=[0, 5], epoch_idx=epoch, save_figs=True)
-
-    # print("EPOCH {}/{}: TRAIN LOSS={}".format(epoch, train_configs['n_epochs'], epoch_train_loss / len(train_dataset)))
-    # print("-----------  TEST LOSS={}".format(test_loss / len(test_dataset)))
-    # print("-------------------------------------------------")
-    
 
     
 

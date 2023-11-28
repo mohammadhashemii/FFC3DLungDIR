@@ -1,5 +1,5 @@
 # dataset configs
-test_data_path: ./data/DIR-Lab/4DCT/mha_cropped/
+test_data_path: ./data/DIRLAB/mha/
 patch_size: 64
 overlap_size: 8
 test_cases: [1]
@@ -16,4 +16,4 @@ lamda: 0.05
 mu: 0.5
 
 # save directories
-save_dir: ./experiments/
+save_dir: ./saved_ours/

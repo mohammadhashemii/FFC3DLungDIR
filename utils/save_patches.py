@@ -127,7 +127,7 @@ def extract_and_save_patches(input_array, output_folder, patch_size=(64, 64, 64)
 if __name__ == '__main__':
 
     root = "./data/DIRLAB/mha/"
-    for c in range(3, 11):
+    for c in range(1, 11):
         for p in range(10):
             img_path = root + "case" + str(c) + "/case" + str(c) + "_T" + str(p) + "0_R.mha"
             im_sitk = sitk.ReadImage(img_path)

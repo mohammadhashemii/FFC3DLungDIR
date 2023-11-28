@@ -69,6 +69,7 @@ class IndexTracker(object):
 
 # # mhd_file = './data/CREATIS/0/10_R_enhanced.mha'
 # mhd_file = './data/DIRLAB/mha/case10/case10_T00_R.mha'
+# # mhd_file = 'data/DIRLAB/mha/case1/case1_T00_patches/patch_124.mha'
 # image = sitk.ReadImage(mhd_file)
 # image_array = sitk.GetArrayFromImage(image)
 # width, height, depth = image_array.shape

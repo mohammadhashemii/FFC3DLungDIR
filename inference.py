@@ -3,29 +3,38 @@ from torch.utils.data import DataLoader
 from dataset import  DIRLABDataset
 from utils.yaml_reader import load_config
 import SimpleITK as sitk
-from utils.fuse_patches import fuse_patches, fuse_dvfs
+from utils.fuse_patches import *
 from utils.TRE import compute_TRE, create_registered_landmark
 from models.model import FFCResNetGenerator
 from models.SpatialTransformerNetwork import SpatialTransformation
 import numpy as np
 from tqdm import tqdm
 import os
-from utils import view3d_image
-
+from utils.view3d_image import *
 torch.manual_seed(42)
 
 
-def test_per_case(experiment, case_num=1, phases_list=[0, 5], epoch_idx=1, save_figs=False):
+resampled_dirlab_volume_sizes = [[234, 248, 248],
+                                [279, 296, 296],
+                                [259, 294, 294],
+                                [247, 289, 289],
+                                [264, 281, 281],
+                                [319, 496, 496],
+                                [339, 496, 496],
+                                [319, 496, 496],
+                                [319, 496, 496],
+                                [299, 496, 496]]
+
+def test_per_case(experiment, epoch_idx, case_num=1, phases_list=[0, 5], save_figs=False):
     
     # Loading configs
-    test_configs = load_config('inference_settings.yaml')
-    model_configs = load_config('FFCResnetGenerator_settings.yaml')
+    test_configs = load_config('./configs/inference_settings.yaml')
+    model_configs = load_config('./configs/FFCResnetGenerator_settings.yaml')
 
     # Creating datasets
     test_dataset = DIRLABDataset(root=test_configs['test_data_path'],
                                  case_list=[case_num],
                                  phases=phases_list) # maximum inhale and exhale
-    # print('TEST DATA: {} pairs of fixed/moving image patches.'.format(len(test_dataset)))
     test_loader = DataLoader(test_dataset, **test_configs['data_loader'])
 
     # Model defining
@@ -41,17 +50,20 @@ def test_per_case(experiment, case_num=1, phases_list=[0, 5], epoch_idx=1, save_
     stn = SpatialTransformation(use_gpu=False)
 
     # Load the weights
-    FFCGenerator.load_state_dict(torch.load(test_configs['save_dir'] + "exp" + str(experiment) + "_patch64_generator.pth"))
-    stn.load_state_dict(torch.load(test_configs['save_dir'] + "exp" + str(experiment) + "_patch64_stn.pth"))
+    generator_weights = "saved_ours/exp" + experiment + "_epoch" + str(epoch_idx) + "_gen.pth"
+    stn_weights = "saved_ours/exp" + experiment + "_epoch" + str(epoch_idx) + "_stn.pth"
+    
+    FFCGenerator.load_state_dict(torch.load(generator_weights))
+    stn.load_state_dict(torch.load(stn_weights))
 
 
     # inference on the patches
     # Note: this code just supports batch_size = 1 for now!
-    DVF_dir = test_configs['save_dir'] + "exp" + str(experiment) + "_DVF/"
-    # print("STEP1: Generating DVFs for case {} in {}".format(case_num, DVF_dir))
+    DVF_dir = test_configs['save_dir'] + "exp" + str(experiment) + "_epoch" + str(epoch_idx) + "_DVF/"
+    print("STEP1: Generating DVFs for case {} in {}".format(case_num, DVF_dir))
     ################################ 1. Generate DVF for patches ################################ 
     with torch.no_grad():
-        for paired_patches, ID in tqdm(test_loader):
+        for paired_patches, ID, info in tqdm(test_loader):
 
             # paired_patches shape: [batch, 2, d, h, w]   
             pair = paired_patches.to(device)
@@ -60,10 +72,7 @@ def test_per_case(experiment, case_num=1, phases_list=[0, 5], epoch_idx=1, save_
             # save DVF    
             if not os.path.exists(DVF_dir):
                 os.mkdir(DVF_dir)
-            torch.save(DVF, DVF_dir + "DVF_case" + str(case_num) 
-                                                 + "_f" + str(ID['fixed_image_phase_num'].item()) + "0"  # fixed image phase number
-                                                 + "_m" + str(ID['moving_image_phase_num'].item()) + "0" # moving image phase number
-                                                 + "_patch" + str(ID['patch_idx'].item()) + ".pt")
+            
 
 
             fi = torch.unsqueeze(pair[:, 0, :], 1).cpu() # fixed patch 
@@ -73,59 +82,23 @@ def test_per_case(experiment, case_num=1, phases_list=[0, 5], epoch_idx=1, save_
 
             registered_images = registered_images.permute(0, 1, 4, 2, 3)
 
-            # view3d_image.view3d_image(fi[0, 0, :, :, :], slice_axis=0)
-            # view3d_image.view3d_image(mi[0, 0, :, :, :], slice_axis=0)
-            # view3d_image.view3d_image(registered_images[0, 0, :, :, :], slice_axis=0)
+            # view3d_image(fi[0, 0, :, :, :], slice_axis=0)
+            # view3d_image(mi[0, 0, :, :, :], slice_axis=0)
+            # view3d_image(registered_images[0, 0, :, :, :], slice_axis=0)
+
+
+            torch.save(DVF, DVF_dir + "DVF_case" + str(case_num) 
+                                                 + "_f" + str(ID['fixed_image_phase_num'].item()) + "0"  # fixed image phase number
+                                                 + "_m" + str(ID['moving_image_phase_num'].item()) + "0" # moving image phase number
+                                                 + "_patch" + str(ID['patch_idx'].item()) + ".pt")
 
             del pair, DVF, fi, mi, registered_images
+
     
-    # print("\nSTEP 2: Fusing image and DVF patches for case {}".format(case_num))
+    
+    print("STEP 2: Fusing image and DVF patches for case {}".format(case_num))
     ################################ 2. Patch fusion ################################
-    # 2.1 fuse fixed patch images
-    image_patches_filenames = os.listdir(test_configs['test_data_path'] + 'case' + str(case_num) + '/case' + str(case_num) + '_patches_' + 'w64o8/')
-    fixed_phase_num = "00"
-    patches_filenames = []
-    for f in image_patches_filenames:
-        if "T" + fixed_phase_num in f and "case" + str(case_num) in f:
-            patches_filenames.append(f)
-
-    patches = []
-    
-    for i in range(len(patches_filenames)):
-        im_sitk = sitk.ReadImage(test_configs['test_data_path'] + 'case' + str(case_num) + '/case' + str(case_num) + '_patches_' + 'w64o8'
-                                    + '/case' + str(case_num) + '_'
-                                    + 'T' + str(fixed_phase_num) 
-                                    +  '_patch' + str(i) + '.mha')
-        patches.append(sitk.GetArrayFromImage(im_sitk))
-
-    patches = torch.tensor(np.array(patches))
-    fused_fixed_img = fuse_patches(patches, case_num=case_num, win_size=64, overlap_size=8)
-    # print("Fixed image patches for phase {} are fused and created a volume with size: {}".format(fixed_phase_num, fused_fixed_img.shape))
-    # view3d_image.view3d_image(fused_fixed_img, slice_axis=0)
-
-    # 2.2 fuse moving patch images
-    image_patches_filenames = os.listdir(test_configs['test_data_path'] + 'case' + str(case_num) + '/case' + str(case_num) + '_patches_' + 'w64o8/')
-    moving_phase_num = '50'
-    patches_filenames = []
-    for f in image_patches_filenames:
-        if "T" + moving_phase_num in f and "case" + str(case_num) in f:
-            patches_filenames.append(f)
-
-    patches = []
-    for i in range(len(patches_filenames)):
-        im_sitk = sitk.ReadImage(test_configs['test_data_path'] + 'case' + str(case_num) + '/case' + str(case_num) + '_patches_' + 'w64o8'
-                                    + '/case' + str(case_num) + '_'
-                                    + 'T' + str(moving_phase_num) 
-                                    +  '_patch' + str(i) + '.mha')
-        patches.append(sitk.GetArrayFromImage(im_sitk))
-
-    patches = torch.tensor(np.array(patches))
-    fused_moving_img = fuse_patches(patches, case_num=case_num, win_size=64, overlap_size=8)
-
-    # print("Moving image patches for phase {} are fused and created a volume with size: {}".format(moving_phase_num, fused_moving_img.shape))
-    # view3d_image.view3d_image(fused_moving_img, slice_axis=0)
-
-    # 2.3 fuse DVF patch images
+    # 2.1 fuse DVF patch images
     DVF_patches_filenames = os.listdir(DVF_dir)
     fixed_img_phase = '00'
     moving_img_phase = '50'
@@ -146,29 +119,29 @@ def test_per_case(experiment, case_num=1, phases_list=[0, 5], epoch_idx=1, save_
     
     dvfs = torch.stack(dvfs, 0)
     
-    fused_dvf = fuse_dvfs(dvfs, case_num=case_num, win_size=64, overlap_size=8)
-    # print("DVF patches are fused and created a volume with size: {}".format(fused_dvf.shape))
+    fused_dvf = fuse_dvf(dvfs, patch_size=(64, 64, 64), overlap=(8, 8, 8), output_size = resampled_dirlab_volume_sizes[case_num-1])
 
-
-    # print("\nSTEP 3: Registration")
+    print("STEP 3: Registration")
     ################################ 3. Registration ################################
-    registered_img = stn(fused_moving_img.unsqueeze(0).unsqueeze(0).permute(0, 1, 4, 3, 2), # (batch, c, w, h, d)
+    fixed_img = torch.tensor(sitk.GetArrayFromImage(sitk.ReadImage(test_configs['test_data_path'] + 'case' + str(case_num) + '/case' + str(case_num) + '_T00_R.mha')))
+    fixed_img = (fixed_img - torch.min(fixed_img)) / (torch.max(fixed_img) - torch.min(fixed_img))
+    moving_img = torch.tensor(sitk.GetArrayFromImage(sitk.ReadImage(test_configs['test_data_path'] + 'case' + str(case_num) + '/case' + str(case_num) + '_T50_R.mha')))
+    moving_img = (moving_img - torch.min(moving_img)) / (torch.max(moving_img) - torch.min(moving_img))
+    
+    registered_img = stn(moving_img.unsqueeze(0).unsqueeze(0).permute(0, 1, 4, 3, 2), # (batch, c, w, h, d)
                                 fused_dvf.unsqueeze(0).permute(0, 1, 4, 3, 2))
 
     registered_img = registered_img.permute(0, 1, 4, 3, 2)[0, 0, :, :, :]
 
 
-
     if save_figs:
-        save_figs_dir = test_configs['save_dir'] + "exp" + str(experiment) + "_figs/"
+        save_figs_dir = test_configs['save_dir'] + "exp" + experiment + "_epoch" + str(epoch_idx) + "_FIGS/"
         if not os.path.exists(save_figs_dir):
             os.mkdir(save_figs_dir)
 
-        view3d_image.view3d_image(fused_fixed_img, slice_axis=0, filename=save_figs_dir + "epoch" + str(epoch_idx) + "_case" + str(case_num) + "_T" + fixed_img_phase + "_fixed.png")
-        view3d_image.view3d_image(fused_moving_img, slice_axis=0, filename=save_figs_dir + "epoch" + str(epoch_idx) + "_case" + str(case_num) + "_T" + moving_img_phase + "_moving.png")
-        view3d_image.view3d_image(registered_img, slice_axis=0, filename=save_figs_dir + "epoch" + str(epoch_idx) + "_case" + str(case_num) + "_registered.png")
-
-
+        view3d_image(fixed_img, slice_axis=0, filename=save_figs_dir + "epoch" + str(epoch_idx) + "_case" + str(case_num) + "_T" + fixed_img_phase + "_fixed.png")
+        view3d_image(moving_img, slice_axis=0, filename=save_figs_dir + "epoch" + str(epoch_idx) + "_case" + str(case_num) + "_T" + moving_img_phase + "_moving.png")
+        view3d_image(registered_img, slice_axis=0, filename=save_figs_dir + "epoch" + str(epoch_idx) + "_case" + str(case_num) + "_registered.png")
 
         # save registered volume
         torch.save(registered_img, save_figs_dir + "epoch" + str(epoch_idx) + "_case" + str(case_num) + "_registered_volume.pt")
@@ -176,17 +149,19 @@ def test_per_case(experiment, case_num=1, phases_list=[0, 5], epoch_idx=1, save_
     # print("\nSTEP 4: TRE calculation")
     ################################ 4. TRE calculation ################################
     
-    landmarks_root = "./data/DIR-Lab/4DCT/points_cropped/"
+    landmarks_root = "./data/DIRLAB/points/"
     
-    fixed_img_landmark_path = landmarks_root + "case" + str(case_num) + "/case" + str(case_num) + "_300_T" + str(fixed_phase_num) + "_xyz_tr.txt"
-    moving_img_landmark_path = landmarks_root + "case" + str(case_num) + "/case" + str(case_num) + "_300_T" + str(moving_phase_num) + "_xyz_tr.txt"
+    fixed_img_landmark_path = landmarks_root + "case" + str(case_num) + "/case" + str(case_num) + "_300_T00_xyz_R.txt"
+    moving_img_landmark_path = landmarks_root + "case" + str(case_num) + "/case" + str(case_num) + "_300_T50_xyz_R.txt"
     
     landmarks_array_fixed = np.loadtxt(fixed_img_landmark_path, dtype=float)
     landmarks_array_moving = np.loadtxt(moving_img_landmark_path, dtype=float)
     
 
     # 4.2 Compute TRE before/after registration
-    registered_landmarks_array, removed_indicies = create_registered_landmark(fixed_img_landmark_path, fused_dvf)
+    # moving_img_info = info[1]
+    # fused_dvf = fused_dvf * (moving_img_info['max_pixel'] - moving_img_info['min_pixel']) + moving_img_info['min_pixel']
+    registered_landmarks_array, removed_indicies = create_registered_landmark(moving_img_landmark_path, fused_dvf)
 
     
 
@@ -201,7 +176,13 @@ def test_per_case(experiment, case_num=1, phases_list=[0, 5], epoch_idx=1, save_
 
     TRE_after_registration_mean, TRE_after_registration_std = compute_TRE(case_num, 
                                                                           registered_landmarks_array, 
-                                                                          landmarks_array_moving)
+                                                                          landmarks_array_fixed)
 
     
     print("TRE after registration for case {0} is: {1:.2f} +- {2:.2f}".format(case_num, TRE_after_registration_mean, TRE_after_registration_std))
+
+
+    import ipdb; ipdb.set_trace()
+
+for i in range(10):
+    test_per_case("00", 60, case_num=i+1, save_figs=True)

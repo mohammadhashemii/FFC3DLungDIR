@@ -30,7 +30,7 @@ def generate_IDs_list(case_list: list, n_phases=10, phases= None):
     return IDs_list
 
 
-def generate_IDs_list_v2(root, case_list: list, n_phases=10, phases= None):
+def generate_IDs_list_patches(root, case_list: list, n_phases=10, phases= None):
     '''
 
     this function generates a list containing dictionaries of paired images indices
@@ -48,8 +48,8 @@ def generate_IDs_list_v2(root, case_list: list, n_phases=10, phases= None):
     for c in case_list:
         for p in phases_list:
             for pp in phases_list:
-                patches_dir = Path(root + 'case' + str(c) + '/case' + str(c) + '_patches_w64o8/' )
-                patch_filenames = [file.name for file in patches_dir.iterdir() if file.name.startswith('case' + str(c) + '_T' + str(pp) + '0')] 
+                patches_dir = Path(root + 'case' + str(c) + '/case' + str(c) + '_T' + str(pp) +'0_patches/')
+                patch_filenames = [file.name for file in patches_dir.iterdir() if file.name.startswith('patch')] 
                 for patch_idx in range(len(patch_filenames)):
                     if p != pp:
                         IDs_list += [{
@@ -58,6 +58,7 @@ def generate_IDs_list_v2(root, case_list: list, n_phases=10, phases= None):
                             'moving_image_phase_num': pp,
                             'patch_idx' : patch_idx
                         }]
+
 
     return IDs_list
 
@@ -180,10 +181,8 @@ class DIRLABDataset(data.Dataset):
         self.overlap_size = overlap_size
         self.transform = transform
 
-
-
         # create a list of image pair IDs
-        self.IDs_list = generate_IDs_list_v2(root=root, case_list=case_list, phases=phases)
+        self.IDs_list = generate_IDs_list_patches(root=root, case_list=case_list, phases=phases)
 
     def __len__(self):
         return len(self.IDs_list)
@@ -193,34 +192,33 @@ class DIRLABDataset(data.Dataset):
         ID = self.IDs_list[index]
 
         # load fixed image data
-        im_sitk = sitk.ReadImage(self.root + 'case' + str(ID['case']) + '/case' + str(ID['case']) + '_patches_' + 'w' + str(self.patch_size) + 'o' + str(self.overlap_size)
-                                 + '/case' + str(ID['case']) + '_'
-                                 + 'T' + str(ID['fixed_image_phase_num']) + '0' 
-                                 +  '_patch' + str(ID['patch_idx']) + '.mha')
+        im_sitk = sitk.ReadImage(self.root + 'case' + str(ID['case'])
+                                 + '/case' + str(ID['case']) + '_T' + str(ID['fixed_image_phase_num']) + '0_patches/'
+                                 + 'patch_' + str(ID['patch_idx']) + '.mha')
         fixed_image = torch.Tensor(sitk.GetArrayFromImage(im_sitk))
-        # print(torch.max(fixed_image), torch.min(fixed_image))
-        # mean, std = torch.mean(fixed_image), torch.std(fixed_image)
-        # fixed_image  = (fixed_image - mean) / std
+
+        fixed_image_info = {'min_pixel': torch.min(fixed_image),
+                            'max_pixel': torch.max(fixed_image)}
 
         fixed_image = (fixed_image - torch.min(fixed_image)) / (torch.max(fixed_image) - torch.min(fixed_image))
-
-        
+    
         # load moving image data
-        im_sitk = sitk.ReadImage(self.root + 'case' + str(ID['case']) + '/case' + str(ID['case']) + '_patches_' + 'w' + str(self.patch_size) + 'o' + str(self.overlap_size)
-                                 + '/case' + str(ID['case']) + '_'
-                                 + 'T' + str(ID['moving_image_phase_num']) + '0' 
-                                 +  '_patch' + str(ID['patch_idx']) + '.mha')
+        im_sitk = sitk.ReadImage(self.root + 'case' + str(ID['case'])
+                                 + '/case' + str(ID['case']) + '_T' + str(ID['moving_image_phase_num']) + '0_patches/'
+                                 + 'patch_' + str(ID['patch_idx']) + '.mha')
+        
         moving_image = torch.Tensor(sitk.GetArrayFromImage(im_sitk))
-        # mean, std = torch.mean(moving_image), torch.std(moving_image)
-        # moving_image   = (moving_image - mean) / std
+
+        moving_image_info = {'min_pixel': torch.min(moving_image),
+                            'max_pixel': torch.max(moving_image)}
+                            
+        
 
         moving_image = (moving_image - torch.min(moving_image)) / (torch.max(moving_image) - torch.min(moving_image))
 
-
-
         paired_patches = torch.stack([fixed_image, moving_image], dim=0) # (c=2, d, h, w)
 
-        return paired_patches, ID
+        return paired_patches, ID, [fixed_image_info, moving_image_info]
 
         
 class CREATISDataset(data.Dataset):

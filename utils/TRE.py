@@ -49,13 +49,13 @@ def compute_TRE(case_num, landmarks_array_fixed, landmarks_array_moving):
     l1 = landmarks_array_fixed.copy()
     l2 = landmarks_array_moving.copy()
 
-    l1[:, 0] *= original_dirlab_volume_spacing[case_num-1][0]
-    l1[:, 1] *= original_dirlab_volume_spacing[case_num-1][1]
-    l1[:, 2] *= original_dirlab_volume_spacing[case_num-1][2]
+    # l1[:, 0] *= original_dirlab_volume_spacing[case_num-1][0]
+    # l1[:, 1] *= original_dirlab_volume_spacing[case_num-1][1]
+    # l1[:, 2] *= original_dirlab_volume_spacing[case_num-1][2]
 
-    l2[:, 0] *= original_dirlab_volume_spacing[case_num-1][0]
-    l2[:, 1] *= original_dirlab_volume_spacing[case_num-1][1]
-    l2[:, 2] *= original_dirlab_volume_spacing[case_num-1][2]
+    # l2[:, 0] *= original_dirlab_volume_spacing[case_num-1][0]
+    # l2[:, 1] *= original_dirlab_volume_spacing[case_num-1][1]
+    # l2[:, 2] *= original_dirlab_volume_spacing[case_num-1][2]
 
     norm = [np.linalg.norm(l1[i] - l2[i]) for i in range(len(l2))]
 

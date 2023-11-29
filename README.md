@@ -1,6 +1,6 @@
 # FFC3DLungDIR: Fast Fourier Convolution-based Model for 4D-CT Lung Deformable Image Registration
 
-This is the code of my B.Sc. thesis project for 4D-CT lung deformable image registration.
+This is the code for 4D-CT Lung Deformable Image Registration.
 
 ## Proposed Framework
 
